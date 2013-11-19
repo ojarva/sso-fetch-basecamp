@@ -1,3 +1,9 @@
+"""
+Downloads all events from the new Basecamp, and stores
+usernames and timestamps
+"""
+
+# pylint: disable=C0301
 import json
 import httplib2
 import base64
@@ -16,6 +22,7 @@ class BasecampNew:
         self.post_queue = []
 
     def get_data(self, url, key):
+        """ Get a single (cached) page of data from basecamp """
         r_key = "basecamp-tmp-%s" % key
         if self.redis.exists(r_key):
             return json.loads(self.redis.get(r_key))
@@ -25,15 +32,19 @@ class BasecampNew:
         return data
         
     def get_people(self):
+        """ Returns list of people """
         return self.get_data("people.json", "get_people")
 
     def get_projects(self):
+        """ Returns list of projects """
         return self.get_data("projects.json", "get_projects")
 
     def get_all_topics(self, page=1):
+        """ Returns list of all topics starting from page """
         return self.get_data("topics.json?page=%s" % page, "get_all_topics_%s" % page)
 
     def get_events(self, since, page=1):
+        """ Returns all events after timestamp, starting from page """
         return self.get_data("events.json?since=%s&page=%s" % (since, page), "get_events_%s_%s" % (since, page))
 
     def process(self):
@@ -55,14 +66,11 @@ class BasecampNew:
                 self.post({"system": "basecamp_new", "timestamp": ts, "username": username})
                 if ts > last_timestamp_save:
                     last_timestamp_save = ts
-            self.post_finished()
+            self.post()
             self.save_last_timestamp(last_timestamp_save)
             page += 1
             if len(events) < 50:
                 break
-
-    def post_finished(self):
-        self.post()
 
     @timing("basecamp.update.post")
     def post(self, data = None):
